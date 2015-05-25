@@ -1,0 +1,105 @@
+.h (header)
+
+#import <Foundation/Foundation.h>
+
+@interface SMShowTutorial : NSObject
+
+#pragma mark - Getter Grid Module Methods
+
++(BOOL)isToShowHelpInGrid;
+
+#pragma mark - Setter Grid Module Methods
+
++(void)setIsToShowHelpInGrid:(BOOL)isToShow;
+
+#pragma mark - Reset Methods
+
++(void)resetEveryThing;
+
++(void)resetEveryThingIfNewVersionUpdated;
+
+@end
+
+.m (implementation)
+#import "SMShowTutorial.h"
+
+@implementation SMShowTutorial
+
+//getters
+
+#pragma mark - Getter Methods
+#pragma mark -  For Grid Module
+
+// For Grid Module - Getter Methods - : Added By Jignesh
+
++(BOOL)isToShowHelpInGrid
+{
+    return [[NSUserDefaults standardUserDefaults]boolForKey:@"keyForShowTutorialGrid"];
+}
+//setters
+
+#pragma mark - Setter Methods
+
++(void)setIsToShowHelpInGrid:(BOOL)isToShow
+{
+    [[NSUserDefaults standardUserDefaults]setBool:isToShow forKey:@"keyForShowTutorialGrid"];
+}
+#pragma mark - Reset Methods
+
++(void)resetEveryThing
+{
+    [SMShowTutorial setIsToShowHelpInGrid:YES];
+    [[NSUserDefaults standardUserDefaults]synchronize];
+}
+
++(void)resetEveryThingIfNewVersionUpdated
+{
+    NSString *versionString = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString*)kCFBundleVersionKey];
+    
+    if(![[[NSUserDefaults standardUserDefaults]objectForKey:@"lastVersion"] isEqualToString:versionString])
+    {
+        [self resetEveryThing];
+        [[NSUserDefaults standardUserDefaults]setObject:versionString forKey:@"lastVersion"];
+    }
+}
+@end
+
+How to Use
+1. Make a .h and .m file, like as above code
+2. import .h file In App delegate write the below code, for first time execuion, 
+      [SMShowTutorial resetEveryThingIfNewVersionUpdated]; // This code use for to checking the Update version and reset 
+      everything when you install the fresh copy of app.
+3.import .h file to your class, where the view overlay tutorial is used.
+4. Make a different xib of View with black background color with 75 % opacity of color.
+5. on your this view locate your all the images and labels to show the tutorials.
+6. Create your View object and give the tap gesture on it.
+7. Create a method of tap gesture
+8. call the view when you are show the overlays tutorials like as ex : [self showHelpView]; suppose in viewDidLoad method
+9. write a below code on your method- [self showHelpView]
+    
+    if ([SMShowTutorial isToShowHelpInGrid]) {
+        
+        
+        [self.helpView setFrame:[UIScreen mainScreen].bounds];
+        [self.helpView setAlpha:0.0];
+        [[[UIApplication sharedApplication]keyWindow]addSubview:self.helpView];
+        [UIView animateWithDuration:0.2 animations:^{
+            [self.helpView setAlpha:1.0];
+            [self.lblOverlaySwipe setText:@"Swipe item to remove from list"];
+        }];
+10. On your Tap gesture Method write a below code for dismiss the view.
+ - (IBAction)dismissHelpView:(id)sender  // This Tap gesture Method create on your View
+{
+    [UIView animateWithDuration:0.2 animations:^{
+        [self.helpView setAlpha:0.0];
+    }completion:^(BOOL finished) {
+        [self.helpView removeFromSuperview];
+        [SMShowTutorial isToShowHelpInGrid:NO];
+    }];
+}
+
+11. Follow all the steps for all the Screen, And create your Overlay tutorial for all the screen of your app.
+   just simple as create setter and getter methods for all the screens.
+        
+       
+
