@@ -1,0 +1,84 @@
+.h (header)
+#import <Foundation/Foundation.h>
+
+
+@interface CacheImages : NSObject
+{
+    NSString *documentsDirectory;
+    NSString *folderNames;
+    
+}
+
+-(void)pathofFolder:(NSString *)foldername checkbool:(BOOL)value;
+-(void)appendImage:(NSString *)imageName fullURL:(NSString *)url checkbool:(BOOL)value withImageView:(UIImageView *) imageView;
+@end
+
+.m (implementation)
+
+#import "CacheImages.h"
+
+@implementation CacheImages
+
+-(id)init{
+    if(self==[super init]){
+        
+           }
+    return self;
+}
+-(void)pathofFolder:(NSString *)foldername checkbool:(BOOL)value{
+    
+    documentsDirectory = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+                                                              NSUserDomainMask,
+                                                              YES) lastObject];
+    NSString *artistImagesFolder = [documentsDirectory stringByAppendingPathComponent:foldername];
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    
+    if (![fileManager fileExistsAtPath:artistImagesFolder
+                           isDirectory:&value] && value == NO)
+    {
+        [fileManager createDirectoryAtPath:artistImagesFolder
+               withIntermediateDirectories:NO
+                                attributes:nil
+                                     error:nil];
+    }
+    else
+    {
+       // NSLog(@"Exit");
+    }
+    
+    folderNames=artistImagesFolder;
+}
+
+-(void)appendImage:(NSString *)imageName fullURL:(NSString *)url checkbool:(BOOL)value withImageView:(UIImageView *) imageView{
+    NSString *name=[folderNames stringByAppendingPathComponent:[NSString stringWithFormat:@"/%@",imageName]];
+    
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    
+    if (![fileManager fileExistsAtPath:name
+                           isDirectory:&value] && value == NO)
+    {
+               dispatch_queue_t concurrentQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+        dispatch_async(concurrentQueue, ^{
+            NSURL *imageURL = [NSURL URLWithString:url];
+
+            NSData *image = [[NSData alloc] initWithContentsOfURL:imageURL];
+            
+            //this will set the image when loading is finished
+            dispatch_async(dispatch_get_main_queue(), ^{
+                
+                UIImage *img=[UIImage imageWithData:image];
+                [image writeToFile:name atomically:NO];
+                imageView.image = img;
+            });
+        });
+    }
+    else
+    {
+        NSString *artistImagesFolder1 =name;
+        UIImage *img=[UIImage imageWithContentsOfFile:artistImagesFolder1];
+        imageView.image = img;
+    }
+
+}
+
+
