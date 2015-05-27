@@ -1,0 +1,248 @@
+.h (Header)
+
+#import <UIKit/UIKit.h>
+#import <Social/Social.h>
+#import <Accounts/Accounts.h>
+
+@interface ViewController : UIViewController
+
+- (IBAction)btnTwitter:(id)sender;
+- (IBAction)btnTwitSharing:(id)sender;
+@end
+
+.m (implementation)
+
+#import "ViewController.h"
+
+@interface ViewController ()
+{
+   NSArray *twitterAccounts;
+}
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+[super viewDidLoad];
+ // Do any additional setup after loading the view, typically from a nib.
+}
+
+- (void)didReceiveMemoryWarning {
+  [super didReceiveMemoryWarning];
+  // Dispose of any resources that can be recreated.
+}
+
+- (IBAction)btnTwitter:(id)sender {
+    [self getTwitterAccountInformation];
+}
+
+- (IBAction)btnTwitSharing:(id)sender {
+    if ([SLComposeViewController isAvailableForServiceType:SLServiceTypeTwitter])
+    {
+        SLComposeViewController *tweetSheet = [SLComposeViewController
+                                               composeViewControllerForServiceType:SLServiceTypeTwitter];
+        [tweetSheet setInitialText:@"Twitter Post"];
+        [tweetSheet addImage:[UIImage imageNamed:@"loader1.png"]];
+        
+       // NSString *apiEndpoint = [NSString stringWithFormat:@"http://tinyurl.com/api-create.php?url=%@",socialSharingURLforAd]; // The shareUrlString is NSString, which having URl
+        
+      //  NSString *shortenUrl = [NSString stringWithContentsOfURL:[NSURL URLWithString:apiEndpoint] encoding:NSASCIIStringEncoding error:nil]; //ShortenUrl is NSString
+        
+        //[tweetSheet addURL:[NSURL URLWithString:shortenUrl]];
+        
+//        if(IS_OS_8_OR_LATER){
+//            [[NSOperationQueue mainQueue]addOperationWithBlock:^{
+//                
+//                [self presentViewController:tweetSheet animated:YES completion:nil];
+//            }];
+//        }else{
+            [self presentViewController:tweetSheet animated:YES completion:nil];
+        //}
+        
+    }
+    else
+    {
+        NSLog(@"Not posting");
+//        [self showAlert:@"It seems that we cannot talk to Twitter at the moment or you have not yet added your Twitter account to this device. Go to the Settings application to add your Twitter account to this device."];
+    }
+
+}
+- (void)getTwitterAccountInformation
+{
+    ACAccountStore *account= [[ACAccountStore alloc] init];
+    ACAccountType *twitterAccountType = [account accountTypeWithAccountTypeIdentifier:ACAccountTypeIdentifierTwitter];
+    
+    if ([account respondsToSelector:@selector(requestAccessToAccountsWithType:options:completion:)])
+    {
+        [account requestAccessToAccountsWithType:twitterAccountType
+                                         options:NULL
+                                      completion:^(BOOL granted, NSError *error)
+         {
+             if (granted)
+                 
+                 [self proceedWithTwitterAuthenticationWithAccount:account andAccoutntType:twitterAccountType];
+             else
+             {
+                 [self alertForTwitter];
+             }
+             
+         }];
+        
+    }
+    else
+    {
+        [account requestAccessToAccountsWithType:twitterAccountType
+                           withCompletionHandler:^(BOOL granted, NSError *error)
+         {
+             
+             if (granted)
+             {
+                 [self proceedWithTwitterAuthenticationWithAccount:account andAccoutntType:twitterAccountType];
+                 
+             }
+             else
+             {
+                 [self alertForTwitter];
+             }
+         }];
+    }
+    
+}
+-(void)proceedWithTwitterAuthenticationWithAccount:(ACAccountStore *)account andAccoutntType:(ACAccountType *)twitterAccountType
+{
+    twitterAccounts = [account accountsWithAccountType:twitterAccountType];
+    if (twitterAccounts.count>0)
+    {
+        [self alertForTwitterAccounts:twitterAccounts];
+    }
+    else
+    {
+        [self alertForTwitter];
+    }
+}
+// showing alert to user for login with twitter
+
+-(void)alertForTwitterAccounts:(NSArray *)twitterAccountsArray
+{
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIActionSheet *actionSheet = [[UIActionSheet alloc]initWithTitle:@"Select the twitter account to login with." delegate:self cancelButtonTitle:nil destructiveButtonTitle:nil otherButtonTitles:nil, nil];
+        
+        ACAccount *account = twitterAccountsArray[0];
+        NSLog(@"Account INFO %@",[account valueForKey:@"properties"]);
+        NSLog(@"Usename %@",account.username);
+        
+        NSString *twitterUserID = ((NSDictionary*)[account valueForKey:@"properties"])[@"user_id"];
+        for(ACAccount *account in twitterAccountsArray )
+        {
+            
+            [actionSheet addButtonWithTitle:account.username];
+        }
+        [actionSheet addButtonWithTitle:@"Cancel"];
+        [actionSheet setCancelButtonIndex:[twitterAccountsArray count]];
+        [actionSheet showInView:self.view];
+        
+    });
+    
+}
+
+-(void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    
+    if(buttonIndex<[twitterAccounts count])
+    {
+        [self authenticateTwiiterAccount:[twitterAccounts objectAtIndex:buttonIndex]];
+    }
+}
+-(void)alertForTwitter
+{
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertView *alertView =   [[UIAlertView alloc]initWithTitle:@"Error"
+                                                             message:@"No Twitter Account Found.\n Please add one or more twitter accounts in Settings of the device."
+                                                            delegate:self
+                                                   cancelButtonTitle:@"OK"
+                                                   otherButtonTitles:nil, nil];
+        
+        [alertView show];
+        
+    });
+    
+    
+}
+-(void)alertForEmailAddress
+{
+    
+    
+    //[HUD hide:YES];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertView *alertView =   [[UIAlertView alloc]initWithTitle:@"Enter your Email Address"
+                                                             message:nil
+                                                            delegate:self
+                                                   cancelButtonTitle:@"Cancel"
+                                                   otherButtonTitles:@"OK", nil];
+        
+        
+        
+        [alertView setAlertViewStyle:UIAlertViewStylePlainTextInput];
+        alertView.tag = 101; // this will pass email id to twitter accnt
+        [alertView show];
+        
+    });
+}
+
+-(void)authenticateTwiiterAccount:(ACAccount *)account
+{
+    
+    NSURL *url = [NSURL URLWithString:@"https://api.twitter.com/1.1/users/show.json"];
+    NSDictionary *params = [NSDictionary dictionaryWithObjectsAndKeys:account.username,@"screen_name",nil];
+    SLRequest *request = [SLRequest requestForServiceType:SLServiceTypeTwitter
+                                            requestMethod:SLRequestMethodGET
+                                                      URL:url
+                                               parameters:params];
+    
+    [request setAccount:account];
+    dispatch_async(dispatch_get_main_queue(), ^
+                   
+                   {
+                       
+                   //    [HUD show:YES];
+                    //   HUD.labelText = @"Connecting with Twitter..";
+                       
+                       [NSURLConnection sendAsynchronousRequest:request.preparedURLRequest
+                                                          queue:[[NSOperationQueue alloc] init]
+                                              completionHandler:^(NSURLResponse *response1, NSData *data, NSError *error)
+                        {
+                            
+                            dispatch_async(dispatch_get_main_queue(), ^
+                                           
+                                           {
+                                               //[SVProgressHUD dismiss];
+                                               
+                                               
+                                               if (data)
+                                               {
+                                                   //[self loadData:data];
+                                                   
+                                                   NSDictionary *receivedDictionary = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil];
+                                                   
+                                                   NSLog(@"data:%@",receivedDictionary);
+                                                   
+                                                 NSString *twitter_emailID=account.username;
+                                          //  [self checkWhetherAlreadyRegisteredWithSameTwitterAccount:account.username];
+                                                   
+                                            //   else
+                                            //       Register User
+                                                   
+                                                  NSString *screenName = [receivedDictionary objectForKey:@"screen_name"];
+                                                 NSString * twitter_ProfilPicImageURL = [receivedDictionary objectForKey:@"profile_image_url"];
+                                                   
+                                               }
+                                           });
+                        }];
+                   });
+    
+}
+@end
+
+1. Import Account and Socail Media Framework
