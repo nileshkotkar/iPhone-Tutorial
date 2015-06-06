@@ -120,3 +120,12 @@ UIBAlertView *alert = [[UIBAlertView alloc] initWithTitle:KLoaderTitle  message:
                 }
             }];
 
+// Simple Application Alert
+// ******* Application Alert**********************
+
+#define TAAlert(TITLE,MSG) [[[UIAlertView alloc] initWithTitle:(TITLE) \
+message:(MSG) \
+delegate:nil \
+cancelButtonTitle:@"Ok" \
+otherButtonTitles:nil] show]
+
