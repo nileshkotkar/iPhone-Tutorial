@@ -1,0 +1,588 @@
+.h
+#import <UIKit/UIKit.h>
+#import "WebserviceAPI.h"
+#import "MBProgressHUD.h"
+#import "MSPCategory.h"
+#import "MspcategoryCell.h"
+#import "MspAttributeCell.h"
+@interface CCMspViewController : UIViewController<UITableViewDataSource,UITableViewDelegate>
+{
+    MBProgressHUD *HUD;
+    MSPCategory *mspCategory;
+    NSMutableArray *arrayForCategory;
+    NSMutableArray *arrayForAdditionalAttributes;
+    NSMutableArray *arrayforValues;
+    int getCatID;
+    NSMutableString *attributedStrings;
+}
+
+@property (weak, nonatomic) IBOutlet UIButton *btnSelectCategory;
+@property (strong, nonatomic) IBOutlet UIView *viewTbleContents;
+@property (weak, nonatomic) IBOutlet UITableView *tableData;
+@property (weak, nonatomic) IBOutlet UITableView *tableCategory;
+@property (weak, nonatomic) IBOutlet UILabel *lblCatNames;
+@property (weak, nonatomic) IBOutlet UIView *viewInnerPopup;
+@property (weak, nonatomic) IBOutlet UISegmentedControl *segmenteControl;
+
+// Calculate View Pop Up
+@property (strong, nonatomic) IBOutlet UIView *viewCalculateContents;
+@property (weak, nonatomic) IBOutlet UILabel *lblMspMessage;
+@property (weak, nonatomic) IBOutlet UILabel *lblAvgPrice;
+@property (weak, nonatomic) IBOutlet UILabel *lblExclPrice;
+@property (weak, nonatomic) IBOutlet UILabel *lblGoodPrice;
+@property (weak, nonatomic) IBOutlet UIView *viewCalcInner;
+- (IBAction)dismissCalView:(id)sender;
+
+- (IBAction)btnSelectCategory:(id)sender;
+- (IBAction)segController:(id)sender;
+- (IBAction)hideTableContents:(id)sender;
+- (IBAction)btnCalculateMsp:(id)sender;
+@end
+
+.m
+
+@interface CCMspViewController ()
+{
+    BOOL checkPath;
+    int buttonTagSelected;
+    NSMutableArray *valueforListings;
+    NSString *attributesValues;
+    NSString *segmentIndexString;
+}
+@end
+
+@implementation CCMspViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view from its nib.
+     HUD = [[MBProgressHUD alloc] initWithView:self.navigationController.view];
+    [HUD setColor:[UIColor blackColor]];
+    [self.navigationController.view addSubview:HUD];
+    
+    [self registerCell];
+    [self setTitle:@"MSP"];
+    segmentIndexString=@"Buy";
+    arrayForCategory=[[NSMutableArray alloc]init];
+    arrayForAdditionalAttributes=[[NSMutableArray alloc]init];
+    arrayforValues=[[NSMutableArray alloc]init];
+}
+-(void)registerCell{
+    if(IS_IPHONE){
+    [self.tableCategory registerNib:[UINib nibWithNibName:@"MspcategoryCell" bundle:nil] forCellReuseIdentifier:@"catCell"];
+    [self.tableData registerNib:[UINib nibWithNibName:@"MspAttributeCell" bundle:nil] forCellReuseIdentifier:@"Cell"];
+    }else{
+        [self.tableCategory registerNib:[UINib nibWithNibName:@"MspcategoryCell" bundle:nil] forCellReuseIdentifier:@"catCell"];
+        [self.tableData registerNib:[UINib nibWithNibName:@"MspAttributeCell~iPad" bundle:nil] forCellReuseIdentifier:@"Cell"];
+
+    }
+    
+    [self.tableData setBackgroundColor:[UIColor clearColor]];
+    self.tableData.tableFooterView=[[UIView alloc]initWithFrame:CGRectZero];
+    self.tableData.separatorColor=[UIColor clearColor];
+    self.tableCategory.tableFooterView=[[UIView alloc]initWithFrame:CGRectZero];
+}
+- (void)setTitle:(NSString *)title
+{
+    [super setTitle:title];
+    UILabel *titleView = (UILabel *)self.navigationItem.titleView;
+    if (!titleView)
+    {
+        titleView = [[UILabel alloc] initWithFrame:CGRectZero];
+        titleView.backgroundColor = [UIColor clearColor];
+        titleView.font = [UIFont boldSystemFontOfSize:17.0];
+        titleView.shadowColor = [UIColor colorWithWhite:0.0 alpha:0.8];
+        titleView.textColor = [UIColor whiteColor]; // Change to desired color
+        self.navigationItem.titleView = titleView;
+    }
+    titleView.text = title;
+    [titleView sizeToFit];
+}
+
+
+- (IBAction)segController:(id)sender {
+    if(_segmenteControl.selectedSegmentIndex==0){
+        segmentIndexString=@"Buy";
+    }else{
+        segmentIndexString=@"Sell";
+    }
+}
+
+
+#pragma mark- Calculate MSP Button
+- (IBAction)btnCalculateMsp:(id)sender {
+    //Select Category
+    if([_btnSelectCategory.titleLabel.text isEqualToString:@"Select Category"])
+    {
+        CCAlert(@"Cash City", @"Please select category");
+        return;
+    }else if([arrayforValues containsObject:[NSNull null]])   // Sub Categories Fields
+    {
+        CCAlert(@"Cash City", @"Please select all the fields of category");
+        return;
+    }else
+    {
+        [self calcualteMSPWS];
+        
+    }
+    
+}
+
+-(void)calcualteMSPWS{
+    [HUD show:YES];
+    HUD.labelText = @"Loading....";
+    NSString *countryID=[[NSUserDefaults standardUserDefaults]objectForKey:@"strCountryID"];
+    [NSURLConnection sendAsynchronousRequest:[WebserviceAPI CalculateMSP:getCatID type:segmentIndexString attributes:attributedStrings countryid:countryID]
+                                       queue:[NSOperationQueue mainQueue]
+                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError)
+     {
+         NSError *errorJson;
+         
+         if (connectionError!=nil)
+         {
+             NSLog(@"error");
+             [[[UIAlertView alloc]initWithTitle:@"Error"
+                                        message:connectionError.localizedDescription
+                                       delegate:self cancelButtonTitle:@"OK"
+                              otherButtonTitles:nil, nil]
+              show];
+         }
+         else
+         {
+             
+             NSDictionary *receivedDictionary = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:&errorJson];
+             NSLog(@"Received Dic %@",receivedDictionary);
+             if([receivedDictionary isKindOfClass:[NSNull class]]){
+                 CCAlert(@"Cash City", @"Problem on server, Please try again later!!");
+                 [HUD hide:YES];
+                 return;
+             }
+             if (errorJson!=nil)
+             {
+                 
+                 [[[UIAlertView alloc]initWithTitle:@"Error"
+                                            message:errorJson.localizedDescription
+                                           delegate:nil cancelButtonTitle:@"OK"
+                                  otherButtonTitles:nil, nil]
+                  show];
+                 
+             }
+             else
+             {
+                 if([[receivedDictionary objectForKey:@"Status"]intValue]==1)
+                 {
+                     NSString *message = [receivedDictionary objectForKey:@"Message"];
+                     self.lblMspMessage.text=message;
+                     NSDictionary *resultDic = [receivedDictionary objectForKey:@"Result"];
+                     [self showCalculateMSPResult:[resultDic objectForKey:@"Average Price"] Excellent:[resultDic objectForKey:@"Excellent Price"] Good:[resultDic objectForKey:@"Good Price"]];
+                     
+                 }else{
+                     CCAlert(@"Cash City", @"No result(s) found!");
+                     
+                 }
+             }
+         }
+         
+         [HUD hide:YES];
+         
+     }];
+
+}
+-(void)showCalculateMSPResult:(NSString *)avgStr Excellent:(NSString *)excStr Good:(NSString *)goodStr{
+    
+    self.viewCalcInner.layer.cornerRadius=8.0;
+    self.viewCalcInner.clipsToBounds=YES;
+    
+    self.viewCalculateContents.frame=self.view.frame;
+    [self.view addSubview:self.viewCalculateContents];
+    CGRect bounds = self.viewCalculateContents.superview.bounds;
+    self.viewCalculateContents.center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    [UIView animateWithDuration:0.2
+                     animations:^
+     {
+         [self.viewCalculateContents setAlpha:1.0];
+         
+     }
+            completion:^(BOOL finished)
+     {
+         self.lblAvgPrice.text=avgStr;
+         self.lblExclPrice.text=excStr;
+         self.lblGoodPrice.text=goodStr;
+     }];
+
+}
+
+- (IBAction)dismissCalView:(id)sender
+{
+    [UIView animateWithDuration:0.1 animations:^{
+        [self.viewCalculateContents setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
+    } completion:^(BOOL finished)
+     {
+         [UIView animateWithDuration:0.1 animations:^
+          {
+              [self.viewCalculateContents setAlpha:0.3];
+              [self.viewCalculateContents setTransform:CGAffineTransformMakeScale(0.9,0.9)];
+          }
+                          completion:^(BOOL finished)
+          {
+              [UIView animateWithDuration:0.05 animations:^
+               {
+                   
+                   [self.viewCalculateContents setAlpha:0.0];
+               }
+                               completion:^(BOOL finished)
+               {
+                   [self.viewCalculateContents removeFromSuperview];
+                   
+                    [self.viewCalculateContents setTransform:CGAffineTransformIdentity];
+               }];
+          }];
+     }];
+
+}
+
+
+#pragma mark -Button Select Category
+- (IBAction)btnSelectCategory:(id)sender {
+    
+    checkPath=NO;
+    self.lblCatNames.text=@"Select Category";
+    [self mspWS];
+    
+}
+-(void)mspWS
+{
+    
+    [HUD show:YES];
+    HUD.labelText = @"Loading....";
+    [NSURLConnection sendAsynchronousRequest:[WebserviceAPI GetAllCategoriesForMSP]
+                                       queue:[NSOperationQueue mainQueue]
+                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError)
+     {
+         NSError *errorJson;
+         
+         if (connectionError!=nil)
+         {
+             NSLog(@"error");
+             [[[UIAlertView alloc]initWithTitle:@"Error"
+                                        message:connectionError.localizedDescription
+                                       delegate:self cancelButtonTitle:@"OK"
+                              otherButtonTitles:nil, nil]
+              show];
+         }
+         else
+         {
+             
+             NSDictionary *receivedDictionary = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:&errorJson];
+             NSLog(@"Received Dic %@",receivedDictionary);
+             if([receivedDictionary isKindOfClass:[NSNull class]]){
+                 CCAlert(@"Cash City", @"Problem on server, Please try again later!!");
+                 [HUD hide:YES];
+                 return;
+             }
+             if (errorJson!=nil)
+             {
+                 
+                 [[[UIAlertView alloc]initWithTitle:@"Error"
+                                            message:errorJson.localizedDescription
+                                           delegate:nil cancelButtonTitle:@"OK"
+                                  otherButtonTitles:nil, nil]
+                  show];
+                 
+             }
+             else
+             {
+                 if([[receivedDictionary objectForKey:@"Status"]intValue]==1){
+                     
+                     [arrayForCategory removeAllObjects];
+                     for (NSDictionary *dic in receivedDictionary[@"Result"]) {
+                         mspCategory =[[MSPCategory alloc]init];
+                         mspCategory.categoryName=[dic objectForKey:@"categoryname"];
+                         mspCategory.catId=[[dic objectForKey:@"id"]intValue];
+                         [arrayForCategory addObject:mspCategory];
+                     }
+                     
+                     [self showAllCategory];
+                 }
+             }
+         }
+         
+         [HUD hide:YES];
+         
+     }];
+    
+}
+-(void)getCategorieswithID :(int)catid{
+    
+    [HUD show:YES];
+    HUD.labelText = @"Loading....";
+    [NSURLConnection sendAsynchronousRequest:[WebserviceAPI GetAllAttributesByCategoryId:catid]
+                                       queue:[NSOperationQueue mainQueue]
+                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError)
+     {
+         NSError *errorJson;
+         
+         if (connectionError!=nil)
+         {
+             NSLog(@"error");
+             [[[UIAlertView alloc]initWithTitle:@"Error"
+                                        message:connectionError.localizedDescription
+                                       delegate:self cancelButtonTitle:@"OK"
+                              otherButtonTitles:nil, nil]
+              show];
+         }
+         else
+         {
+             
+             NSDictionary *receivedDictionary = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:&errorJson];
+             NSLog(@"Received Dic %@",receivedDictionary);
+             if([receivedDictionary isKindOfClass:[NSNull class]]){
+                 CCAlert(@"Cash City", @"Problem on server, Please try again later!!");
+                 [HUD hide:YES];
+                 return;
+             }
+             if (errorJson!=nil)
+             {
+                 
+                 [[[UIAlertView alloc]initWithTitle:@"Error"
+                                            message:errorJson.localizedDescription
+                                           delegate:nil cancelButtonTitle:@"OK"
+                                  otherButtonTitles:nil, nil]
+                  show];
+                 
+             }
+             else
+             {
+                 if([[receivedDictionary objectForKey:@"Status"]intValue]==1)
+                 {
+                     [arrayForCategory removeAllObjects];
+                     [arrayforValues removeAllObjects];
+                     mspCategory.arrayValues=[[NSMutableArray alloc]init];
+                     
+                     for(NSDictionary *catAttDic in receivedDictionary[@"Result"])
+                     {
+                         
+                         mspCategory=[[MSPCategory alloc]init];
+                         mspCategory.strAttName=[catAttDic objectForKey:@"attributename"];
+                         mspCategory.arrayValues=[catAttDic objectForKey:@"values"];
+                         mspCategory.checkValuePresent=NO;
+                         [arrayforValues addObject:[NSNull null]];
+                         [arrayForCategory addObject:mspCategory];
+                     }
+                     NSLog(@"Array Values %@",mspCategory.arrayValues);
+                     
+                     [self.tableData reloadData];
+                     
+                 }
+             }
+         }
+         
+         [HUD hide:YES];
+         
+     }];
+    
+}
+-(void)btnDropDown:(UIButton *)sender
+{
+    buttonTagSelected=(int)[sender tag];
+    checkPath=YES;
+    MSPCategory *catDatas= (MSPCategory *)[arrayForCategory objectAtIndex:buttonTagSelected];
+    self.lblCatNames.text=[NSString stringWithFormat:@"Select %@",catDatas.strAttName];
+
+    [self showAllCategory];
+}
+
+-(void)showAllCategory
+{
+    self.viewTbleContents.hidden=NO;
+    [self.tableCategory reloadData];
+    self.viewInnerPopup.layer.cornerRadius=8.0;
+    self.viewInnerPopup.clipsToBounds=YES;
+    
+    self.viewTbleContents.frame=self.view.frame;
+    [self.view addSubview:self.viewTbleContents];
+    CGRect bounds = self.viewTbleContents.superview.bounds;
+    self.viewTbleContents.center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    [UIView animateWithDuration:0.2
+                     animations:^
+     {
+         [self.viewTbleContents setAlpha:1.0];
+         [self.tableCategory  setAlpha:1.0];
+         
+     }
+                     completion:^(BOOL finished)
+     {
+         [self.tableCategory flashScrollIndicators];
+     }];
+  
+}
+- (IBAction)hideTableContents:(id)sender {
+    
+    [UIView animateWithDuration:0.1 animations:^{
+        [self.viewTbleContents setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
+    } completion:^(BOOL finished)
+     {
+         [UIView animateWithDuration:0.1 animations:^
+          {
+              [self.viewTbleContents setAlpha:0.3];
+              [self.viewTbleContents setTransform:CGAffineTransformMakeScale(0.9,0.9)];
+          }
+                          completion:^(BOOL finished)
+          {
+              [UIView animateWithDuration:0.05 animations:^
+               {
+                   
+                   [self.viewTbleContents setAlpha:0.0];
+               }
+                               completion:^(BOOL finished)
+               {
+                   self.viewTbleContents.hidden=YES;
+                   [self.viewTbleContents removeFromSuperview];
+                   
+                   if(checkPath==NO)
+                   {
+                       [self getCategorieswithID:getCatID];
+                       
+                   }
+                   [self.viewTbleContents setTransform:CGAffineTransformIdentity];
+               }];
+          }];
+     }];
+    
+}
+
+#pragma mark - Table View Delegates
+-(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section{
+    if(tableView==self.tableCategory)
+    {
+        if(checkPath==NO)
+        return [arrayForCategory count];
+        else{
+        MSPCategory *adattributes = (MSPCategory *)[arrayForCategory objectAtIndex:buttonTagSelected];
+        return adattributes.arrayValues.count;
+        }
+    }else{
+        return arrayForCategory.count;
+    }
+    
+}
+-(UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    if(tableView==self.tableCategory)
+    {
+        static NSString     *CellIdentifier = @"catCell";
+        MspcategoryCell *cell=(MspcategoryCell *)[tableView dequeueReusableCellWithIdentifier:CellIdentifier];
+    
+        if(checkPath==YES)
+        {
+            MSPCategory *catDatas= (MSPCategory *)[arrayForCategory objectAtIndex:buttonTagSelected];
+            NSDictionary *dic=[catDatas.arrayValues objectAtIndex:indexPath.row];
+            if([dic objectForKey:@"value"]!=nil){
+             cell.lblCategoryName.text=[dic objectForKey:@"value"];
+            }
+        }
+        else
+        {
+        MSPCategory *catData= (MSPCategory *)[arrayForCategory objectAtIndex:indexPath.row];
+        cell.lblCategoryName.text=catData.categoryName;
+        }
+
+        return cell;
+    }
+    else
+    {
+        static NSString     *CellIdentifier = @"Cell";
+        MspAttributeCell *cell1=(MspAttributeCell *)[tableView dequeueReusableCellWithIdentifier:CellIdentifier];
+        cell1.selectionStyle=UITableViewCellSelectionStyleNone;
+        cell1.backgroundColor=[UIColor clearColor];
+        MSPCategory *catDatas= (MSPCategory *)[arrayForCategory objectAtIndex:indexPath.row];
+        if(catDatas.checkValuePresent==YES)
+        {
+            if([arrayforValues objectAtIndex:indexPath.row]==[NSNull null])
+            {
+                [cell1.btnAttributeName setTitle:[NSString stringWithFormat:@"Select %@",catDatas.strAttName] forState:UIControlStateNormal];
+                [cell1.btnAttributeName setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+            }else
+            {
+                [cell1.btnAttributeName setTitle:[arrayforValues objectAtIndex:indexPath.row] forState:UIControlStateNormal];
+                [cell1.btnAttributeName setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+                
+            }
+        }else
+        {
+            
+            [cell1.btnAttributeName setTitle:[NSString stringWithFormat:@"Select %@",catDatas.strAttName] forState:UIControlStateNormal];
+            [cell1.btnAttributeName setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+            [cell1.btnAttributeName addTarget:self action:@selector(btnDropDown:) forControlEvents:UIControlEventTouchUpInside];
+            cell1.btnAttributeName.tag=indexPath.row;
+
+        }
+        return cell1;
+    }
+}
+-(void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath{
+    if(tableView==self.tableCategory)
+    {
+        if(checkPath==YES)
+        {
+             MspAttributeCell *cell2 = (MspAttributeCell *)[self.tableData cellForRowAtIndexPath:[NSIndexPath indexPathForRow:buttonTagSelected inSection:0]];
+             MSPCategory *catData= (MSPCategory *)[arrayForCategory objectAtIndex:buttonTagSelected];
+           
+             NSDictionary *dic=[catData.arrayValues objectAtIndex:indexPath.row];
+            catData.checkValuePresent=YES;
+            if([dic objectForKey:@"value"] != nil)
+            {
+                [cell2.btnAttributeName setTitle:[dic objectForKey:@"value"] forState:UIControlStateNormal];
+                [cell2.btnAttributeName setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+                [arrayforValues replaceObjectAtIndex:buttonTagSelected withObject:[dic objectForKey:@"value"]];
+                attributesValues=[arrayforValues componentsJoinedByString:@"~"];
+                attributedStrings = [NSMutableString stringWithString:attributesValues];
+                [attributedStrings insertString:@"~" atIndex:0];
+                 NSLog(@"mu is %@",attributedStrings);
+                [self hideTableContents:nil];
+            }
+        }
+        else
+        {
+            
+            MSPCategory *catData= (MSPCategory *)[arrayForCategory objectAtIndex:indexPath.row];
+            [self.btnSelectCategory setTitle:catData.categoryName forState:UIControlStateNormal];
+            [self.btnSelectCategory setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+            [self getCategorieswithID:catData.catId];
+             getCatID=catData.catId;
+            [self hideTableContents:nil];
+
+        }
+    }
+}
+
+-(void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    // Remove seperator inset
+    if ([cell respondsToSelector:@selector(setSeparatorInset:)]) {
+        [cell setSeparatorInset:UIEdgeInsetsZero];
+    }
+    
+    // Prevent the cell from inheriting the Table View's margin settings
+    if ([cell respondsToSelector:@selector(setPreservesSuperviewLayoutMargins:)]) {
+        [cell setPreservesSuperviewLayoutMargins:NO];
+    }
+    
+    // Explictly set your cell's layout margins
+    if ([cell respondsToSelector:@selector(setLayoutMargins:)]) {
+        [cell setLayoutMargins:UIEdgeInsetsZero];
+    }
+}
+
+-(CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath{
+    if(tableView==self.tableData){
+        return 66;
+    }else{
+        return 44;
+    }
+}
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
