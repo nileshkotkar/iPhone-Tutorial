@@ -1,0 +1,59 @@
+Show Pop Up
+
+-(void)showAllCategory
+{
+    self.viewTbleContents.hidden=NO;
+    [self.tableCategory reloadData];
+    self.viewInnerPopup.layer.cornerRadius=8.0;
+    self.viewInnerPopup.clipsToBounds=YES;
+    
+    self.viewTbleContents.frame=self.view.frame;
+    [self.view addSubview:self.viewTbleContents];
+    CGRect bounds = self.viewTbleContents.superview.bounds;
+    self.viewTbleContents.center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    [UIView animateWithDuration:0.2
+                     animations:^
+     {
+         [self.viewTbleContents setAlpha:1.0];
+         [self.tableCategory  setAlpha:1.0];
+         
+     }
+                     completion:^(BOOL finished)
+     {
+         [self.tableCategory flashScrollIndicators];
+     }];
+  
+}
+
+
+Hide Pop Up
+
+[UIView animateWithDuration:0.1 animations:^{
+        [self.viewTbleContents setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
+    } completion:^(BOOL finished)
+     {
+         [UIView animateWithDuration:0.1 animations:^
+          {
+              [self.viewTbleContents setAlpha:0.3];
+              [self.viewTbleContents setTransform:CGAffineTransformMakeScale(0.9,0.9)];
+          }
+                          completion:^(BOOL finished)
+          {
+              [UIView animateWithDuration:0.05 animations:^
+               {
+                   
+                   [self.viewTbleContents setAlpha:0.0];
+               }
+                               completion:^(BOOL finished)
+               {
+                   self.viewTbleContents.hidden=YES;
+                   [self.viewTbleContents removeFromSuperview];
+                   
+                   if(checkPath==NO)
+                   {
+                       [self getCategorieswithID:getCatID];
+                       
+                   }
+                   [self.viewTbleContents setTransform:CGAffineTransformIdentity];
+               }];
+          }];
