@@ -53,3 +53,7 @@
     // commit animations
     [UIView commitAnimations];
 }
+END CODE
+
+MAKE A pem file using command
+openssl pkcs12 -in apns-dev-cert.p12 -out apns-dev-cert.pem -nodes -clcerts
